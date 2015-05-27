@@ -90,6 +90,10 @@
 #include <display_config.h>
 #endif
 
+#ifdef SAMSUNG_HDMI_SUPPORT
+#include "SecTVOutService.h"
+#endif
+
 #define DISPLAY_COUNT       1
 #define MIN_DIRTYRECT_COUNT 5
 
@@ -206,6 +210,16 @@ SurfaceFlinger::SurfaceFlinger()
 
     ALOGI_IF(mDebugRegion, "showupdates enabled");
     ALOGI_IF(mDebugDDMS, "DDMS debugging enabled");
+
+#ifdef SAMSUNG_HDMI_SUPPORT
+    ALOGD(">>> Run service");
+    android::SecTVOutService::instantiate();
+#if defined(SAMSUNG_EXYNOS5250)
+    mHdmiClient = SecHdmiClient::getInstance();
+    mHdmiClient->setHdmiEnable(1);
+#endif
+#endif
+
 }
 
 void SurfaceFlinger::onFirstRef()
@@ -2143,6 +2157,34 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
     // swap buffers (presentation)
     hw->swapBuffers(getHwComposer());
 }
+
+#ifdef SWAP_BUFFERS_WORKAROUND
+int SurfaceFlinger::getNumVisibleRegions() {
+    HWComposer& hwc(getHwComposer());
+    int visibleRegions = 0;
+    for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
+        sp<const DisplayDevice> hw(mDisplays[dpy]);
+        const int32_t id = hw->getHwcDisplayId();
+            if (id >= 0) {
+                const Vector< sp<Layer> >& currentLayers(
+                    hw->getVisibleLayersSortedByZ());
+                const size_t count = currentLayers.size();
+                HWComposer::LayerListIterator cur = hwc.begin(id);
+                const HWComposer::LayerListIterator end = hwc.end(id);
+                for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
+                    const sp<Layer>& layer(currentLayers[i]);
+                    const Layer::State& s(layer->getDrawingState());
+                    Rect bounds(s.transform.transform(layer->computeBounds()));
+                    Region visibleRegion;
+                    visibleRegion.set(bounds);
+                    if (!visibleRegion.isEmpty())
+                        visibleRegions++;
+                }
+            }
+    }
+    return visibleRegions;
+}
+#endif
 
 #ifdef QCOM_BSP
 bool SurfaceFlinger::computeTiledDr(const sp<const DisplayDevice>& hw) {
