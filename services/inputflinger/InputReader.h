@@ -878,6 +878,7 @@ private:
     int32_t mKeyboardType;
 
     int32_t mRotationMapOffset; // determines if and how volume keys rotate
+    bool mSwapKeys; // swap back with recents button
 
     std::vector<KeyDown> mKeyDowns; // keys that are down
     int32_t mMetaState;
@@ -911,6 +912,8 @@ private:
     void processKey(nsecs_t when, bool down, int32_t scanCode, int32_t usageCode);
 
     bool updateMetaStateIfNeeded(int32_t keyCode, bool down);
+
+    int getAdjustedKeyCode(int keyCode);
 
     ssize_t findKeyDown(int32_t scanCode);
 
