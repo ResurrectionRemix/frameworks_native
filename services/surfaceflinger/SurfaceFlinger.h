@@ -289,8 +289,6 @@ public:
 
     static int primaryDisplayOrientation;
 
-    static int primaryDisplayOrientation;
-
     static char const* getServiceName() ANDROID_API {
         return "SurfaceFlinger";
     }
