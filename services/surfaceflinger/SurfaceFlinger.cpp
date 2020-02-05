@@ -560,6 +560,13 @@ SurfaceFlinger::~SurfaceFlinger()
     }
 }
 
+void SurfaceFlinger::setTranslate(int x, int y, const DisplayDeviceState& state){
+    for (const auto& [token, displayDevice] : mDisplays) {
+        displayDevice->setTranslate(x, y);
+        displayDevice->setProjection(state.orientation, state.viewport, state.frame);
+    }
+}
+
 void SurfaceFlinger::binderDied(const wp<IBinder>& /* who */)
 {
     // the window manager died on us. prepare its eulogy.
@@ -6398,9 +6405,9 @@ status_t SurfaceFlinger::CheckTransactCodeCredentials(uint32_t code) {
         code == IBinder::SYSPROPS_TRANSACTION) {
         return OK;
     }
-    // Numbers from 1000 to 1035, 2020 and 20000 are currently used for backdoors. The code
+    // Numbers from 1000 to 1035 and 2020 are currently used for backdoors. The code
     // in onTransact verifies that the user is root, and has access to use SF.
-    if ((code >= 1000 && code <= 1035) || (code == 20000)) {
+    if ((code >= 1000 && code <= 1035) || (code == 2020) || (code == 20000)) {
         ALOGV("Accessing SurfaceFlinger through backdoor code: %u", code);
         return OK;
     }
@@ -6732,22 +6739,17 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                 }
                 return NO_ERROR;
             }
-            case 1035: {
-                n = data.readInt32();
-                mDebugDisplayConfigSetByBackdoor = false;
-                if (n >= 0) {
-                    const auto displayToken = getInternalDisplayToken();
-                    const auto display = getDisplayDeviceLocked(displayToken);
-                    // RefreshRateConfigs are only supported on Primary display.
-                    if (display && display->isPrimary()) {
-                        mRefreshRateConfigs.setActiveConfig(n);
-                        mRefreshRateConfigs.populate(getHwComposer().getConfigs(*display->getId()));
-                    }
-                    status_t result = setAllowedDisplayConfigs(displayToken, {n});
-                    if (result != NO_ERROR) {
-                        return result;
-                    }
-                    mDebugDisplayConfigSetByBackdoor = true;
+            case 2020: {
+                int x = data.readInt32();
+                int y = data.readInt32();
+                ssize_t index = mCurrentState.displays.indexOfKey(getInternalDisplayTokenLocked());
+                if (index < 0) {
+                    ALOGE("ScreenStabilization: Invalid token %p", getInternalDisplayTokenLocked().get());
+                } else {
+                    const DisplayDeviceState& state = mCurrentState.displays.valueAt(index);
+                    setTranslate(x, y, state);
+                    invalidateHwcGeometry();
+                    repaintEverything();
                 }
                 return NO_ERROR;
             }
