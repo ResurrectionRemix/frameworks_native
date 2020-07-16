@@ -6739,6 +6739,25 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                 }
                 return NO_ERROR;
             }
+            case 1035: {
+                n = data.readInt32();
+                mDebugDisplayConfigSetByBackdoor = false;
+                if (n >= 0) {
+                    const auto displayToken = getInternalDisplayToken();
+                    const auto display = getDisplayDeviceLocked(displayToken);
+                    // RefreshRateConfigs are only supported on Primary display.
+                    if (display && display->isPrimary()) {
+                        mRefreshRateConfigs.setActiveConfig(n);
+                        mRefreshRateConfigs.populate(getHwComposer().getConfigs(*display->getId()));
+                    }
+                    status_t result = setAllowedDisplayConfigs(displayToken, {n});
+                    if (result != NO_ERROR) {
+                        return result;
+                    }
+                    mDebugDisplayConfigSetByBackdoor = true;
+                }
+                return NO_ERROR;
+            }
             case 2020: {
                 int x = data.readInt32();
                 int y = data.readInt32();
